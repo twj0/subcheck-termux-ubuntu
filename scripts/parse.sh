@@ -37,6 +37,9 @@ parse_vless_link() {
     local node_name_encoded=$(echo "$params" | cut -d'#' -f2)
     local node_name=$(url_decode "$node_name_encoded")
     
+    # If node name is empty, use server address as fallback
+    [ -z "$node_name" ] && node_name="$server_address:$server_port"
+    
     # Use jq to safely construct a JSON object
     jq -n \
       --arg protocol "vless" \
@@ -45,6 +48,38 @@ parse_vless_link() {
       --arg port "$server_port" \
       --arg id "$user_info" \
       --arg params "?${params%#*}" \
+      '{protocol: $protocol, name: $name, address: $address, port: $port, id: $id, params: $params}'
+}
+
+# Parse a single vmess:// link and convert to JSON
+parse_vmess_link() {
+    local link=$1
+    # Remove "vmess://" prefix and decode base64
+    local encoded_config=${link#vmess://}
+    local decoded_config=$(echo "$encoded_config" | base64 --decode 2>/dev/null || echo "{}")
+    
+    # Extract fields using jq
+    local address=$(echo "$decoded_config" | jq -r '.add // empty')
+    local port=$(echo "$decoded_config" | jq -r '.port // empty')
+    local id=$(echo "$decoded_config" | jq -r '.id // empty')
+    local name=$(echo "$decoded_config" | jq -r '.ps // empty')
+    
+    # If any required field is missing, return empty
+    if [ -z "$address" ] || [ -z "$port" ] || [ -z "$id" ]; then
+        return
+    fi
+    
+    # If name is empty, use server address as fallback
+    [ -z "$name" ] && name="$address:$port"
+    
+    # Use jq to safely construct a JSON object
+    jq -n \
+      --arg protocol "vmess" \
+      --arg name "$name" \
+      --arg address "$address" \
+      --arg port "$port" \
+      --arg id "$id" \
+      --arg params "" \
       '{protocol: $protocol, name: $name, address: $address, port: $port, id: $id, params: $params}'
 }
 
@@ -103,7 +138,14 @@ while IFS= read -r line; do
 
     if [[ "$line" == vless://* ]]; then
         NODE_JSON=$(parse_vless_link "$line")
-        NODES_JSON=$(echo "$NODES_JSON" | jq --argjson node "$NODE_JSON" '. + [$node]')
+        if [ ! -z "$NODE_JSON" ]; then
+            NODES_JSON=$(echo "$NODES_JSON" | jq --argjson node "$NODE_JSON" '. + [$node]')
+        fi
+    elif [[ "$line" == vmess://* ]]; then
+        NODE_JSON=$(parse_vmess_link "$line")
+        if [ ! -z "$NODE_JSON" ]; then
+            NODES_JSON=$(echo "$NODES_JSON" | jq --argjson node "$NODE_JSON" '. + [$node]')
+        fi
     fi
 done <<< "$RAW_CONTENT"
 

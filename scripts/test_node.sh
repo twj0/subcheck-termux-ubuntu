@@ -4,7 +4,7 @@
 set -e
 
 # --- Configuration ---
-XRAY_BIN="../xray/xray" # Relative path to the xray binary
+XRAY_BIN="./xray/xray" # Relative path to the xray binary
 CONFIG_FILE="temp_config.json"
 LOG_FILE="xray_temp.log"
 SOCKS_PORT=10808
@@ -41,20 +41,25 @@ NODE_NAME=$(echo "$NODE_JSON" | jq -r '.name')
 
 # Function to generate a failure JSON output
 generate_failure_output() {
+    local error_msg="$1"
     jq -n \
       --arg name "$NODE_NAME" \
-      '{name: $name, success: false, latency: -1, download: -1, upload: -1, error: $1}'
+      --arg error "$error_msg" \
+      '{name: $name, success: false, latency: -1, download: -1, upload: -1, error: $error}'
 }
 
 # 2. Generate Xray config from node JSON
-# This is a simplified config generator for VLESS + TCP + TLS
 ADDRESS=$(echo "$NODE_JSON" | jq -r '.address')
 PORT=$(echo "$NODE_JSON" | jq -r '.port')
 ID=$(echo "$NODE_JSON" | jq -r '.id')
+PROTOCOL=$(echo "$NODE_JSON" | jq -r '.protocol')
+
 # A very basic way to get SNI from params, assuming format is ?...&sni=...
-SNI=$(echo "$NODE_JSON" | jq -r '.params' | grep -o 'sni=[^&]*' | cut -d= -f2)
+SNI=$(echo "$NODE_JSON" | jq -r '.params' | grep -o 'sni=[^&]*' | cut -d= -f2 2>/dev/null || echo "")
 [ -z "$SNI" ] && SNI=$ADDRESS # Fallback SNI to address if not found
 
+# Generate config based on protocol
+if [ "$PROTOCOL" == "vless" ]; then
 cat > $CONFIG_FILE <<- EOM
 {
   "log": {
@@ -82,7 +87,7 @@ cat > $CONFIG_FILE <<- EOM
             "users": [
               {
                 "id": "$ID",
-                "flow": "xtls-rprx-direct"
+                "encryption": "none"
               }
             ]
           }
@@ -99,8 +104,63 @@ cat > $CONFIG_FILE <<- EOM
   ]
 }
 EOM
+elif [ "$PROTOCOL" == "vmess" ]; then
+cat > $CONFIG_FILE <<- EOM
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "$LOG_FILE"
+  },
+  "inbounds": [
+    {
+      "port": $SOCKS_PORT,
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": true
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "vmess",
+      "settings": {
+        "vnext": [
+          {
+            "address": "$ADDRESS",
+            "port": $PORT,
+            "users": [
+              {
+                "id": "$ID",
+                "alterId": 0
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "$SNI"
+        }
+      }
+    }
+  ]
+}
+EOM
+else
+    generate_failure_output "Unsupported protocol: $PROTOCOL"
+    exit 1
+fi
 
-# 3. Start Xray
+# 3. Check if Xray binary exists
+if [ ! -f "$XRAY_BIN" ]; then
+    generate_failure_output "Xray binary not found at $XRAY_BIN. Please run init.sh first."
+    exit 1
+fi
+
+# Start Xray
 $XRAY_BIN -c $CONFIG_FILE > /dev/null 2>&1 &
 XRAY_PID=$!
 sleep 2 # Give xray time to start

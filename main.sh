@@ -14,9 +14,11 @@ print_error() {
 
 # --- Script Usage ---
 usage() {
-    echo "Usage: $0 -i <input_url_or_file> [-o <output_file.json>]"
+    echo "Usage: $0 -i <input_url_or_file> [-o <output_file.json>] [-d] [-l <limit>]"
     echo "  -i: Subscription URL or local file path (e.g., config.yaml)"
     echo "  -o: (Optional) Path to save the output JSON file."
+    echo "  -d: (Optional) Enable debug mode for verbose output."
+    echo "  -l: (Optional) Limit the number of nodes to test (default: all)."
     exit 1
 }
 
@@ -24,15 +26,23 @@ usage() {
 
 INPUT_SOURCE=""
 OUTPUT_FILE=""
+DEBUG_MODE=false
+NODE_LIMIT=""
 
 # Parse command-line arguments
-while getopts ":i:o:" opt; do
+while getopts ":i:o:dl:" opt; do
   case ${opt} in
     i )
       INPUT_SOURCE=$OPTARG
       ;;
     o )
       OUTPUT_FILE=$OPTARG
+      ;;
+    d )
+      DEBUG_MODE=true
+      ;;
+    l )
+      NODE_LIMIT=$OPTARG
       ;;
     \? )
       usage
@@ -70,13 +80,24 @@ test_subscription() {
     node_count=$(echo "$nodes_json" | jq 'length')
     print_info "Found $node_count nodes to test from '$sub_source'."
 
-    for i in $(seq 0 $(($node_count - 1))); do
+    # Apply node limit if specified
+    local test_count=$node_count
+    if [ ! -z "$NODE_LIMIT" ] && [ "$NODE_LIMIT" -lt "$node_count" ]; then
+        test_count=$NODE_LIMIT
+        print_info "Limiting test to first $test_count nodes."
+    fi
+
+    for i in $(seq 0 $(($test_count - 1))); do
         local node_json
         node_json=$(echo "$nodes_json" | jq -c ".[$i]")
         local node_name
         node_name=$(echo "$node_json" | jq -r '.name')
         
-        print_info "Testing node $((i+1))/$node_count: $node_name"
+        print_info "Testing node $((i+1))/$test_count: $node_name"
+        
+        if [ "$DEBUG_MODE" = true ]; then
+            echo "[DEBUG] Node JSON: $node_json"
+        fi
         
         local result
         result=$( (scripts/test_node.sh "$node_json") || echo "{\"name\":\"$node_name\",\"success\":false,\"error\":\"Test script failed unexpectedly.\"}" )
