@@ -1,107 +1,336 @@
-# SubCheck Termux - 轻量级节点检查工具
+# SubCheck Termux Ubuntu
 
-专为 Termux + Ubuntu 等轻量级环境设计的代理节点检查工具。基于 Shell 脚本实现，支持多种代理协议的解析、延迟测试和速度测试。
+A lightweight node checking service optimized for Termux Ubuntu environment on constrained devices, with special optimizations for China mainland network conditions.
 
-## ✨ 功能特性
+## Features
 
-- **轻量级设计**：无需 Docker，纯 Shell 脚本 + Linux 工具链
-- **多协议支持**：
-    - VLESS/VMess 协议解析
-    - Base64 编码订阅链接
-    - Clash YAML 配置文件
-- **智能测试**：
-    - TCP 连接延迟测试
-    - 下载/上传速度测试  
-    - 可配置超时和重试机制
-- **配置驱动**：支持 YAML 配置文件，可自定义所有参数
-- **多输出格式**：JSON/YAML/Base64 格式输出
-- **质量过滤**：支持最低速度和最大延迟阈值过滤
+- **Multi-protocol Support**: VLESS, VMess, and Clash YAML format parsing
+- **China Network Optimized**: DNS optimization and GitHub proxy support
+- **Lightweight Design**: Minimal dependencies, suitable for old phones
+- **Multiple Testing Modes**: Full test, simplified test, and quick test
+- **VPS Deployment**: Automated deployment script for Ubuntu VPS
+- **Configuration Driven**: YAML configuration support
+- **Multiple Output Formats**: JSON, YAML, and Base64 encoding
+- **Termux Scheduler**: Automated scheduled testing with web interface
+- **System Service**: Background daemon with systemd integration
+- **Web Management**: Modern web interface for remote monitoring
 
-## 🔧 环境要求
+## Quick Start
 
-- 一个基于 Debian/Ubuntu 的 Linux 环境 (专为 Termux PRoot Ubuntu 设计)。
-- `sudo` 权限。
-- 依赖的命令行工具 (将由 `init.sh` 自动安装):
-    - `curl`
-    - `wget`
-    - `jq`
-    - `yq`
-    - `speedtest-cli`
-    - `unzip`
+### 1. Termux Environment Setup (Recommended)
 
-## 🚀 快速开始
-
-### 1. 克隆项目
+For Termux + Ubuntu24 environment:
 
 ```bash
-git clone <your-repository-url>
-cd subcheck-termux-ubuntu
+# One-click setup for Termux
+bash termux_setup.sh
+
+# Start the service
+bash start_subcheck.sh
 ```
 
-### 2. 初始化环境
+This will:
+- Apply Termux-specific optimizations
+- Install dependencies
+- Configure network optimization
+- Setup auto-start
+- Launch web interface at http://localhost:8080
 
-首次使用时，必须运行初始化脚本。它将安装所有必要的工具并下载 Xray 核心。
+### 2. Manual Setup
 
 ```bash
+# Install dependencies and download core
 bash init.sh
+
+# Quick connectivity test (first 3 nodes)
+bash quick_test.sh
+
+# Simplified China-optimized test
+bash simple_china_test.sh
 ```
-该脚本会自动检查依赖和 Xray-core 是否存在，可以安全地重复运行。
 
-### 3. 运行测试
+### 3. Scheduled Testing
 
-使用 `main.sh` 脚本来启动测试。
-
-**基本语法:**
 ```bash
-bash main.sh -i <输入源> [-o <输出文件>]
+# Install as system service
+bash termux_scheduler.sh install
+
+# Start scheduled testing
+bash termux_scheduler.sh start
+
+# Check status
+bash termux_scheduler.sh status
 ```
 
-- `-i <输入源>`: **必需参数**。可以是远程订阅链接 (URL) 或本地配置文件路径 (例如 `config.yaml`)。
-- `-o <输出文件>`: **可选参数**。如果提供，测试结果将以 JSON 格式保存到指定文件；否则，将直接打印在控制台。
+## New Termux Features
 
-**示例:**
+### Termux Scheduler (`termux_scheduler.sh`)
 
-- **从 URL 订阅进行测试，并在控制台查看结果:**
-  ```bash
-  bash main.sh -i "https://example.com/your/subscription/link"
-  ```
+Based on SubsCheck-Win-GUI architecture, provides:
 
-- **从本地 Clash 配置文件测试，并将结果保存到 `results.json`:**
-  ```bash
-  bash main.sh -i config_example.yaml -o results.json
-  ```
+- **Scheduled Testing**: Configurable intervals (default: 2 hours for Termux)
+- **Web Interface**: Modern dashboard at http://localhost:8080
+- **Result Storage**: Automatic result archiving and cleanup
+- **Notifications**: Telegram bot support
+- **System Integration**: Systemd service support
 
-## 📊 输出格式说明
-
-脚本最终会输出一个 JSON 数组，其中每个对象代表一个节点的测试结果。
-
-**成功节点的示例:**
-```json
-{
-  "name": "Your-Node-Name-01",
-  "success": true,
-  "latency": 150,
-  "download": 85.5,
-  "upload": 20.1,
-  "error": null
-}
+**Commands:**
+```bash
+bash termux_scheduler.sh daemon    # Run in background
+bash termux_scheduler.sh test      # Single test
+bash termux_scheduler.sh install   # Install system service
+bash termux_scheduler.sh status    # Show status
+bash termux_scheduler.sh config    # Edit configuration
 ```
 
-**失败节点的示例:**
-```json
-{
-  "name": "Your-Node-Name-02",
-  "success": false,
-  "latency": -1,
-  "download": -1,
-  "upload": -1,
-  "error": "Latency test failed (timeout or error)."
-}
+### Termux Optimizations
+
+- **Low Power Mode**: Reduced CPU usage and testing frequency
+- **Mobile Network**: Extended timeouts for unstable connections
+- **Memory Efficient**: Lower concurrency for constrained devices
+- **Auto-start**: Automatic service startup on boot
+
+### Web Interface Features
+
+- **Real-time Status**: Live monitoring of testing progress
+- **Historical Results**: Browse past test results
+- **Manual Testing**: Trigger tests on demand
+- **Log Viewer**: Real-time log monitoring
+- **Mobile Responsive**: Optimized for phone screens
+
+## Testing Scripts
+
+### `quick_test.sh`
+- **Purpose**: Super fast connectivity check
+- **Features**: Tests first 3 nodes only, basic TCP connectivity
+- **Use case**: Quick verification of subscription and basic functionality
+
+### `simple_china_test.sh`
+- **Purpose**: China mainland network optimized testing
+- **Features**: DNS optimization, GitHub proxy, robust parsing
+- **Use case**: Regular testing in China network environment
+
+### `china_optimized.sh`
+- **Purpose**: Full-featured China optimized testing
+- **Features**: Complete node testing with speed measurement
+- **Use case**: Comprehensive node evaluation
+
+### `termux_scheduler.sh` 
+- **Purpose**: Automated scheduled testing service
+- **Features**: Web interface, notifications, result storage
+- **Use case**: Continuous monitoring and scheduled testing
+
+## Configuration
+
+### Scheduler Configuration (`~/.subcheck/scheduler.conf`)
+
+```bash
+# Testing interval (seconds)
+INTERVAL=7200              # 2 hours (Termux optimized)
+
+# Concurrency (reduced for mobile)
+CONCURRENT=5               # Lower for phones
+
+# Timeouts (extended for mobile networks)
+TIMEOUT=45                 # Increased for unstable connections
+
+# Web interface
+ENABLE_WEB=true
+WEB_PORT=8080
+
+# Notifications
+ENABLE_NOTIFICATION=false
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_CHAT_ID=""
+
+# Result retention
+KEEP_DAYS=7
 ```
 
-- `name` (string): 节点名称。
-- `success` (boolean): `true` 表示测试成功, `false` 表示失败。
-- `latency` (integer): 连接延迟（毫秒）。失败时为 `-1`。
-- `download` (float): 下载速度 (Mbit/s)。失败时为 `-1`。
-- `upload` (float): 上传速度 (Mbit/s)。失败时为 `-1`。
-- `error` (string|null): 如果测试失败，这里会提供简要的错误信息。
+### Node Testing Configuration (`config.yaml`)
+
+```yaml
+# Testing parameters
+concurrent: 5               # Reduced for Termux
+timeout: 45                 # Extended for mobile networks
+output_format: "json"
+
+# Filtering
+min_speed: 1.0
+max_latency: 2000
+
+# Network optimization
+use_github_proxy: true
+dns_servers:
+  - "223.5.5.5"
+  - "119.29.29.29"
+```
+
+## Termux Management Commands
+
+### Service Management
+```bash
+# Start service
+bash start_subcheck.sh start
+
+# Check status
+bash start_subcheck.sh status
+
+# View logs
+bash start_subcheck.sh logs
+
+# Stop service
+bash start_subcheck.sh stop
+
+# Manual test
+bash start_subcheck.sh test
+```
+
+### Web Interface Access
+- **Local**: http://localhost:8080
+- **Network**: http://[phone-ip]:8080 (if accessible)
+
+## Network Optimizations
+
+### DNS Configuration
+- Primary: 223.5.5.5 (Alibaba)
+- Secondary: 119.29.29.29 (Tencent)
+- Fallback: 114.114.114.114, 8.8.8.8
+
+### GitHub Proxy
+- Uses `https://ghfast.top/` for GitHub API and downloads
+- Automatic fallback to direct connection
+- Improves reliability in China mainland
+
+### Termux-Specific Optimizations
+- **Power Saving**: CPU governor optimization
+- **Process Priority**: Lower priority for background operation
+- **Network Buffering**: Optimized for mobile networks
+
+## Dependencies
+
+### Required
+- `curl` - HTTP requests
+- `jq` - JSON processing
+- `python3` - Web interface
+- `base64` - Encoding/decoding
+
+### Optional
+- `yq` - YAML processing
+- `unzip` - Archive extraction
+- `speedtest-cli` - Speed testing
+- `xray` - Core proxy engine
+
+## Installation Methods
+
+### Method 1: Termux One-Click Setup 
+```bash
+bash termux_setup.sh
+bash start_subcheck.sh
+```
+
+### Method 2: System Service Installation
+```bash
+bash termux_scheduler.sh install
+systemctl start subcheck-scheduler
+```
+
+### Method 3: VPS Deployment
+```bash
+bash deploy_vps.sh user@your-vps-ip
+```
+
+## Troubleshooting
+
+### Termux-Specific Issues
+
+1. **Service Won't Start**
+   ```bash
+   # Check permissions
+   chmod +x *.sh
+   
+   # Check dependencies
+   pkg install curl jq python
+   ```
+
+2. **Web Interface Not Accessible**
+   ```bash
+   # Check if port is in use
+   netstat -tlnp | grep 8080
+   
+   # Try different port
+   export WEB_PORT=8081
+   bash start_subcheck.sh restart
+   ```
+
+3. **Auto-start Not Working**
+   ```bash
+   # Check Termux:Boot app is installed
+   # Verify boot script permissions
+   ls -la ~/.termux/boot/
+   ```
+
+### Performance Issues
+- Reduce `CONCURRENT` value in config
+- Increase `TIMEOUT` for slow networks
+- Enable power saving mode
+
+## Project Structure
+
+```bash
+subcheck-termux-ubuntu/
+├── main.sh                    # Main testing script
+├── init.sh                    # Environment initialization
+├── quick_test.sh              # Quick connectivity test
+├── simple_china_test.sh       # Simplified China-optimized test
+├── china_optimized.sh         # Full China-optimized test
+├── deploy_vps.sh              # VPS deployment script
+├── termux_scheduler.sh        #  Scheduled testing service
+├── termux_setup.sh            #  Termux environment setup
+├── start_subcheck.sh          #  Service management script
+├── network_optimize.sh        #  Network optimization
+├── config.yaml                # Node testing configuration
+├── subscription.txt           # Subscription URLs
+├── scripts/
+│   ├── parse.sh              # Node parsing logic
+│   └── test_node.sh          # Single node testing
+└── README.md                 # This file
+
+# Runtime directories (created automatically)
+~/.subcheck/
+├── scheduler.conf            # Scheduler configuration
+├── subscriptions.txt         # User subscriptions
+├── logs/                     # Test logs
+└── results/                  # Test results
+```
+
+## Architecture
+
+Based on **SubsCheck-Win-GUI** design principles:
+
+- **Modular Design**: Separate components for parsing, testing, scheduling
+- **Configuration-Driven**: Flexible configuration system
+- **Web Interface**: Modern dashboard for monitoring
+- **Background Service**: Reliable daemon operation
+- **Result Storage**: Persistent result archiving
+- **Notification System**: Alert mechanisms
+
+## License
+
+This project is for educational and research purposes only. Users are responsible for compliance with local laws and regulations.
+
+## Contributing
+
+Contributions are welcome! Please ensure:
+- Code follows shell scripting best practices
+- Changes are tested in Termux environment
+- Termux-specific optimizations are maintained
+- Documentation is updated accordingly
+
+## Support
+
+For issues and questions:
+1. Check the troubleshooting section
+2. Review debug logs: `bash start_subcheck.sh logs`
+3. Test with simplified scripts first: `bash quick_test.sh`
+4. Verify Termux environment: `bash termux_setup.sh`

@@ -43,16 +43,28 @@ parse_vless() {
     local user_info host_info server_address server_port params node_name
     user_info=$(echo "$stripped" | cut -d'@' -f1)
     host_info=$(echo "$stripped" | cut -d'@' -f2)
-    server_address=$(echo "$host_info" | cut -d'?' -f1 | cut -d':' -f1)
-    server_port=$(echo "$host_info" | cut -d'?' -f1 | cut -d':' -f2)
+    
+    # 解析地址和端口
+    local addr_port=$(echo "$host_info" | cut -d'?' -f1)
+    server_address=$(echo "$addr_port" | cut -d':' -f1)
+    server_port=$(echo "$addr_port" | cut -d':' -f2)
+    
+    # 验证端口是否为数字
+    if ! [[ "$server_port" =~ ^[0-9]+$ ]]; then
+        return 1
+    fi
+    
     params=$(echo "$host_info" | cut -d'?' -f2)
     
     # 提取节点名称
     if [[ "$params" == *"#"* ]]; then
-        node_name=$(echo "$params" | cut -d'#' -f2 | sed 's/%20/ /g' | sed 's/%2B/+/g')
+        node_name=$(echo "$params" | cut -d'#' -f2 | sed 's/%20/ /g' | sed 's/%2B/+/g' | sed 's/%E2%80%8B//g')
     else
         node_name="$server_address:$server_port"
     fi
+    
+    # 清理节点名称中的特殊字符
+    node_name=$(echo "$node_name" | tr -d '\u200B\u200C\u200D\uFEFF')
     
     echo "{\"name\":\"$node_name\",\"address\":\"$server_address\",\"port\":\"$server_port\",\"protocol\":\"vless\"}"
 }
