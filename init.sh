@@ -54,7 +54,7 @@ else
     fi
     
     # Add ghproxy.com for users in mainland China
-    PROXY_URL="https://ghproxy.com/$LATEST_URL"
+    PROXY_URL="https://ghfast.top/$LATEST_URL"
     
     print_info "Downloading from (via proxy): $PROXY_URL"
     
