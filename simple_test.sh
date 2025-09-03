@@ -20,12 +20,24 @@ test_parsing_only() {
     
     # Test parsing with timeout and show errors
     local nodes_json
+    local parse_stderr
     print_info "Running: bash scripts/parse.sh \"$url\""
-    nodes_json=$(timeout 3 bash scripts/parse.sh "$url" 2>&1 || echo "[]")
     
-    # Debug output
-    if [ "$nodes_json" = "[]" ] || [ -z "$nodes_json" ]; then
-        print_error "Parse script output: $nodes_json"
+    # Capture both stdout and stderr separately
+    {
+        nodes_json=$(timeout 3 bash scripts/parse.sh "$url" 2>&3)
+    } 3>&2 2>&1 | {
+        parse_stderr=$(cat)
+    }
+    
+    # Show stderr output for debugging
+    if [ ! -z "$parse_stderr" ]; then
+        echo "[DEBUG] Parse script stderr: $parse_stderr"
+    fi
+    
+    # If parsing failed, set empty array
+    if [ -z "$nodes_json" ]; then
+        nodes_json="[]"
     fi
     
     if [ "$nodes_json" = "[]" ] || [ -z "$nodes_json" ]; then
@@ -34,7 +46,12 @@ test_parsing_only() {
     fi
     
     local node_count
+    # Debug: show first few lines of JSON to understand format
+    echo "[DEBUG] First 3 lines of JSON output:"
+    echo "$nodes_json" | head -3
+    
     node_count=$(echo "$nodes_json" | jq 'length' 2>/dev/null || echo "0")
+    echo "[DEBUG] Node count: $node_count"
     
     if [ "$node_count" -gt 0 ]; then
         print_info "✅ Successfully parsed $node_count nodes"

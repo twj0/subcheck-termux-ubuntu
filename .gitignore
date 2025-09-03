@@ -1,0 +1,15 @@
+# Ignore SubsCheck-Win-GUI project
+SubsCheck-Win-GUI/
+
+# Temporary files
+temp_config.json
+xray_temp.log
+*.tmp
+
+# Output files
+results.json
+output/
+
+# System files
+.DS_Store
+Thumbs.db
