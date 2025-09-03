@@ -209,6 +209,17 @@ parse_subscription_optimized() {
             return 1
         fi
         input="$temp_file"
+    elif [ -f "$input" ]; then
+        # 如果是文件，读取第一个URL
+        local first_url=$(head -n 1 "$input" | tr -d '\r\n')
+        if [[ "$first_url" == http* ]]; then
+            print_info "从文件中读取URL: $first_url"
+            if ! optimized_curl "$first_url" "$temp_file"; then
+                print_error "无法下载订阅内容: $first_url"
+                return 1
+            fi
+            input="$temp_file"
+        fi
     fi
     
     # 检查内容格式
