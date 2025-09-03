@@ -25,11 +25,26 @@ fi
 
 # 2. Install yq for YAML parsing
 print_info "Installing yq for YAML parsing..."
-if sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_arm64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq; then
-    print_info "yq installed successfully."
+if ! command -v yq > /dev/null 2>&1; then
+    # Use GitHub proxy for faster download
+    GITHUB_PROXY="https://ghfast.top/"
+    YQ_URL="${GITHUB_PROXY}https://github.com/mikefarah/yq/releases/latest/download/yq_linux_arm64"
+    
+    print_info "Downloading yq via GitHub proxy..."
+    if wget -O /usr/local/bin/yq "$YQ_URL" --timeout=10 --tries=3; then
+        chmod +x /usr/local/bin/yq
+        print_info "yq installed successfully."
+    else
+        print_warning "Failed to download yq via proxy, trying direct download..."
+        if wget -O /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_arm64" --timeout=30 --tries=2; then
+            chmod +x /usr/local/bin/yq
+            print_info "yq installed successfully (direct download)."
+        else
+            print_error "Failed to install yq. YAML config support will be limited."
+        fi
+    fi
 else
-    print_error "Failed to install yq."
-    exit 1
+    print_info "yq is already installed."
 fi
 
 # 3. Check and install Xray-core
@@ -44,22 +59,37 @@ else
     # Create directory
     mkdir -p $XRAY_DIR
     
-    # Fetch the latest release URL for linux-arm64-v8a
-    LATEST_URL=$(curl -s "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r '.assets[] | select(.name | test("linux-arm64-v8a.zip$")) | .browser_download_url')
+    # Use GitHub proxy for API call and download
+    GITHUB_PROXY="https://ghfast.top/"
+    API_URL="${GITHUB_PROXY}https://api.github.com/repos/XTLS/Xray-core/releases/latest"
+    
+    print_info "Fetching latest Xray-core release info via proxy..."
+    LATEST_URL=$(curl -s --connect-timeout 10 "$API_URL" | jq -r '.assets[] | select(.name | test("linux-arm64-v8a.zip$")) | .browser_download_url' 2>/dev/null)
     
     if [ -z "$LATEST_URL" ]; then
-        print_error "Could not find the latest Xray-core release for linux-arm64-v8a. Please check the repository manually."
+        print_warning "Failed to get release info via proxy, trying direct API call..."
+        LATEST_URL=$(curl -s --connect-timeout 30 "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r '.assets[] | select(.name | test("linux-arm64-v8a.zip$")) | .browser_download_url' 2>/dev/null)
+    fi
+    
+    if [ -z "$LATEST_URL" ]; then
+        print_error "Could not find the latest Xray-core release for linux-arm64-v8a. Please check your network connection."
         rm -rf $XRAY_DIR
         exit 1
     fi
     
-    # Add ghproxy.com for users in mainland China
-    PROXY_URL="https://ghfast.top/$LATEST_URL"
+    # Try proxy download first, then direct download
+    PROXY_URL="${GITHUB_PROXY}${LATEST_URL}"
     
-    print_info "Downloading from (via proxy): $PROXY_URL"
-    
-    # Download and unzip
-    wget -qO xray.zip "$PROXY_URL"
+    print_info "Downloading Xray-core via proxy: $PROXY_URL"
+    if ! wget -qO xray.zip "$PROXY_URL" --timeout=15 --tries=2; then
+        print_warning "Proxy download failed, trying direct download..."
+        print_info "Downloading directly from: $LATEST_URL"
+        if ! wget -qO xray.zip "$LATEST_URL" --timeout=30 --tries=2; then
+            print_error "Failed to download Xray-core. Please check your network connection."
+            rm -rf $XRAY_DIR
+            exit 1
+        fi
+    fi
     unzip -o xray.zip -d $XRAY_DIR
     
     # Clean up
