@@ -111,10 +111,18 @@ test_subscription() {
         local result
         result=$( (scripts/test_node.sh "$node_json") || echo "{\"name\":\"$node_name\",\"success\":false,\"error\":\"Test script failed unexpectedly.\"}" )
         
-        # Add the result to our list of all results
-        all_results=$(echo "$all_results" | jq --argjson res "$result" '. + [$res]')
-        
-        echo "$result" | jq '.'
+        # Validate JSON before processing
+        if echo "$result" | jq . > /dev/null 2>&1; then
+            # Add the result to our list of all results
+            all_results=$(echo "$all_results" | jq --argjson res "$result" '. + [$res]')
+            echo "$result" | jq '.'
+        else
+            # Create a safe fallback JSON if parsing failed
+            local safe_result
+            safe_result=$(jq -n --arg name "$node_name" --arg error "Invalid JSON output from test script" '{name: $name, success: false, latency: -1, download: -1, upload: -1, error: $error}')
+            all_results=$(echo "$all_results" | jq --argjson res "$safe_result" '. + [$res]')
+            echo "$safe_result" | jq '.'
+        fi
     done
     echo "$all_results"
 }

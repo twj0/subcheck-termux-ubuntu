@@ -205,6 +205,16 @@ fi
 # Skip upload test for now as it's more complex without proper speedtest proxy support
 
 # 6. Output result as JSON (ensure proper number formatting)
+# Validate numeric values before output
+[ -z "$LATENCY_MS" ] && LATENCY_MS="0"
+[ -z "$DOWNLOAD_SPEED" ] && DOWNLOAD_SPEED="0"
+[ -z "$UPLOAD_SPEED" ] && UPLOAD_SPEED="0"
+
+# Ensure values are valid numbers
+LATENCY_MS=$(echo "$LATENCY_MS" | grep -E '^[0-9]+(\.[0-9]+)?$' || echo "0")
+DOWNLOAD_SPEED=$(echo "$DOWNLOAD_SPEED" | grep -E '^[0-9]+(\.[0-9]+)?$' || echo "0")
+UPLOAD_SPEED=$(echo "$UPLOAD_SPEED" | grep -E '^[0-9]+(\.[0-9]+)?$' || echo "0")
+
 jq -n \
   --arg name "$NODE_NAME" \
   --arg latency "$LATENCY_MS" \
