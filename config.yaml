@@ -1,26 +1,17 @@
-# SubCheck Configuration File
-# Based on insights from SubsCheck-Win-GUI project
-
-# Basic Settings
-concurrent: 50          # 并发线程数
+# SubCheck 精简配置
 timeout: 5000           # 超时时间(毫秒)
-speedtest-timeout: 10   # 测速超时时间(秒)
-min-speed: 1            # 最低速度要求(MB/s)
+concurrent: 10          # 并发测试数
+min_speed: 1            # 最低速度要求(Mbps)
+max_latency: 1000       # 最大延迟(毫秒)
 
-# Test Settings
-test-latency: true      # 测试延迟
-test-speed: true        # 测试速度
-max-latency: 1000       # 最大延迟(毫秒)
+# 网络优化
+dns_servers:
+  - 8.8.8.8
+  - 1.1.1.1
+  - 114.114.114.114
 
-# Output Settings
-output-format: json     # 输出格式: json, yaml, base64
-output-file: results.json
-save-working-nodes: true
-
-# Network Settings
-user-agent: "SubCheck/1.0"
-github-proxy: ""        # GitHub代理地址
-
-# Advanced Settings
-retry-count: 2          # 重试次数
-retry-delay: 1          # 重试间隔(秒)
+# 测速设置
+speed_test:
+  enabled: true
+  test_file_size: 100   # 测试文件大小(KB)
+  timeout: 10           # 测速超时(秒)
