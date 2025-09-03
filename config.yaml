@@ -1,17 +1,27 @@
-# SubCheck 精简配置
-timeout: 5000           # 超时时间(毫秒)
-concurrent: 10          # 并发测试数
-min_speed: 1            # 最低速度要求(Mbps)
-max_latency: 1000       # 最大延迟(毫秒)
+# SubCheck 配置文件
 
-# 网络优化
-dns_servers:
-  - 8.8.8.8
-  - 1.1.1.1
-  - 114.114.114.114
+# 测试间隔 (秒)
+interval: 3600
 
-# 测速设置
-speed_test:
-  enabled: true
-  test_file_size: 100   # 测试文件大小(KB)
-  timeout: 10           # 测速超时(秒)
+# 最大测试节点数
+max_nodes: 20
+
+# 超时设置
+timeout:
+  connect: 10
+  total: 30
+
+# 代理设置
+proxy:
+  socks_port: 10808
+  
+# 测试设置
+test:
+  speed_test_size: 1048576  # 1MB
+  max_concurrent: 3
+  retry_count: 2
+
+# 日志设置
+log:
+  level: info
+  file: subcheck.log

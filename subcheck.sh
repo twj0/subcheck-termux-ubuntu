@@ -46,7 +46,8 @@ parse_vmess() {
     # 添加padding以确保Base64解码正确
     local padding=$((4 - ${#config} % 4))
     if [ $padding -ne 4 ]; then
-        config="${config}${printf '=%.0s' $(seq 1 $padding)}"
+        padding_chars=$(printf '=%.0s' $(seq 1 $padding))
+        config="${config}${padding_chars}"
     fi
     
     local decoded=$(echo "$config" | base64 -d 2>/dev/null)
