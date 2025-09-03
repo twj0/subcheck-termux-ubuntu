@@ -109,8 +109,10 @@ if [ "$IS_URL_LIST" = true ]; then
     while IFS= read -r sub_url; do
         [ -z "$sub_url" ] && continue
         SUB_RESULTS=$(test_subscription "$sub_url")
-        # Merge results from this subscription into the main list
-        ALL_RESULTS=$(echo "$ALL_RESULTS" | jq --argjson sub "$SUB_RESULTS" '. + $sub')
+        # Merge results from this subscription into the main list, only if SUB_RESULTS is not empty
+        if [ -n "$SUB_RESULTS" ] && echo "$SUB_RESULTS" | jq . > /dev/null 2>&1; then
+            ALL_RESULTS=$(echo "$ALL_RESULTS" | jq --argjson sub "$SUB_RESULTS" '. + $sub')
+        fi
     done < "$INPUT_SOURCE"
 else
     # It's a single subscription source
