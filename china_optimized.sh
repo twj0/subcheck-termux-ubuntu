@@ -220,16 +220,8 @@ parse_subscription_optimized() {
         return 1
     fi
     
-    # 检测编码并转换
-    local encoding
-    encoding=$(file -bi "$input" | grep -o 'charset=[^;]*' | cut -d= -f2)
-    
-    if [ "$encoding" != "utf-8" ] && [ -n "$encoding" ]; then
-        print_info "转换编码: $encoding -> utf-8"
-        iconv -f "$encoding" -t utf-8 "$input" > "${input}.utf8"
-        input="${input}.utf8"
-        content=$(cat "$input")
-    fi
+    # 检测编码并转换（跳过file命令检测）
+    print_info "使用UTF-8编码处理内容"
     
     # 解析不同格式
     local nodes_json="[]"
