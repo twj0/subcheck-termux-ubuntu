@@ -50,38 +50,72 @@ if [ -z "$INPUT_SOURCE" ]; then
     usage
 fi
 
-# 1. Parse nodes
-print_info "Parsing nodes from '$INPUT_SOURCE'..."
-# The parse script outputs a JSON array, or JSON objects on new lines for YAML
-NODES_JSON=$(scripts/parse.sh "$INPUT_SOURCE")
+# --- Main Test Function ---
+# This function tests a single subscription source (URL or file)
+test_subscription() {
+    local sub_source=$1
+    local all_results="[]"
 
-if [ -z "$NODES_JSON" ] || ! echo "$NODES_JSON" | jq . > /dev/null 2>&1; then
-    print_error "Failed to parse nodes or parsing returned empty/invalid JSON."
-    exit 1
+    print_info "Parsing nodes from '$sub_source'..."
+    # The parse script outputs a JSON array, or JSON objects on new lines for YAML
+    local nodes_json
+    nodes_json=$(scripts/parse.sh "$sub_source")
+
+    if [ -z "$nodes_json" ] || ! echo "$nodes_json" | jq . > /dev/null 2>&1; then
+        print_error "Failed to parse nodes from '$sub_source' or parsing returned empty/invalid JSON."
+        return
+    fi
+
+    local node_count
+    node_count=$(echo "$nodes_json" | jq 'length')
+    print_info "Found $node_count nodes to test from '$sub_source'."
+
+    for i in $(seq 0 $(($node_count - 1))); do
+        local node_json
+        node_json=$(echo "$nodes_json" | jq -c ".[$i]")
+        local node_name
+        node_name=$(echo "$node_json" | jq -r '.name')
+        
+        print_info "Testing node $((i+1))/$node_count: $node_name"
+        
+        local result
+        result=$( (scripts/test_node.sh "$node_json") || echo "{\"name\":\"$node_name\",\"success\":false,\"error\":\"Test script failed unexpectedly.\"}" )
+        
+        # Add the result to our list of all results
+        all_results=$(echo "$all_results" | jq --argjson res "$result" '. + [$res]')
+        
+        echo "$result" | jq '.'
+    done
+    echo "$all_results"
+}
+
+
+# --- Script Body ---
+
+# Check if the input is a file containing a list of URLs
+IS_URL_LIST=false
+if [ -f "$INPUT_SOURCE" ]; then
+    # Check if the first line looks like a URL
+    FIRST_LINE=$(head -n 1 "$INPUT_SOURCE")
+    if [[ "$FIRST_LINE" == http* ]]; then
+        IS_URL_LIST=true
+    fi
 fi
 
-# Get the number of nodes
-NODE_COUNT=$(echo "$NODES_JSON" | jq 'length')
-print_info "Found $NODE_COUNT nodes to test."
-
-# 2. Loop through nodes and test them
 ALL_RESULTS="[]"
-for i in $(seq 0 $(($NODE_COUNT - 1))); do
-    NODE_JSON=$(echo "$NODES_JSON" | jq -c ".[$i]")
-    NODE_NAME=$(echo "$NODE_JSON" | jq -r '.name')
-    
-    print_info "Testing node $((i+1))/$NODE_COUNT: $NODE_NAME"
-    
-    # Run the test script for the current node
-    # Use a subshell to capture output and handle potential errors
-    RESULT=$( (scripts/test_node.sh "$NODE_JSON") || echo "{\"name\":\"$NODE_NAME\",\"success\":false,\"error\":\"Test script failed unexpectedly.\"}" )
-    
-    # Add the result to our list of all results
-    ALL_RESULTS=$(echo "$ALL_RESULTS" | jq --argjson res "$RESULT" '. + [$res]')
-    
-    # Optional: Print intermediate result
-    echo "$RESULT" | jq '.'
-done
+
+if [ "$IS_URL_LIST" = true ]; then
+    print_info "Input file detected as a list of subscription URLs. Testing each one..."
+    while IFS= read -r sub_url; do
+        [ -z "$sub_url" ] && continue
+        SUB_RESULTS=$(test_subscription "$sub_url")
+        # Merge results from this subscription into the main list
+        ALL_RESULTS=$(echo "$ALL_RESULTS" | jq --argjson sub "$SUB_RESULTS" '. + $sub')
+    done < "$INPUT_SOURCE"
+else
+    # It's a single subscription source
+    ALL_RESULTS=$(test_subscription "$INPUT_SOURCE")
+fi
 
 # 3. Output final results
 print_info "All tests complete."
