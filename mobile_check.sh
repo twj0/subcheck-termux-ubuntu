@@ -39,10 +39,24 @@ main() {
 
     print_info "Starting node check for '$subscription_file'..."
 
-    # 1. Parse the subscription file to get a JSON array of nodes
+    # 1. Determine the input for the parser (URL or file path)
+    local first_line
+    first_line=$(head -n 1 "$subscription_file" | tr -d '\r\n')
+    
+    local parse_input
+    if [[ "$first_line" == http* ]]; then
+        print_info "Detected URL in file: $first_line"
+        parse_input="$first_line"
+    else
+        print_info "Parsing file content directly."
+        parse_input="$subscription_file"
+    fi
+
+    # 2. Parse the subscription to get a JSON array of nodes
     # We redirect stderr to /dev/null to hide the progress messages from parse.sh
+    print_info "Calling parser for '$parse_input'..."
     local nodes_json
-    nodes_json=$(bash scripts/parse.sh "$subscription_file" 2>/dev/null)
+    nodes_json=$(bash scripts/parse.sh "$parse_input" 2>/dev/null)
 
     if [ -z "$nodes_json" ] || [ "$nodes_json" == "[]" ]; then
         print_error "No nodes found or failed to parse. Please check the subscription file."
@@ -54,7 +68,7 @@ main() {
     print_info "Found $total_nodes nodes. Starting tests..."
     echo "-----------------------------------------------------"
 
-    # 2. Loop through each node and test it
+    # 3. Loop through each node and test it
     local working_count=0
     local results=""
     for i in $(seq 0 $((total_nodes - 1))); do
@@ -87,7 +101,7 @@ main() {
         fi
     done
 
-    # 3. Print summary
+    # 4. Print summary
     echo "-----------------------------------------------------"
     print_info "Test finished."
     print_info "Summary: ${working_count} out of ${total_nodes} nodes are working."
