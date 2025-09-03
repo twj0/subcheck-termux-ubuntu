@@ -18,9 +18,15 @@ test_parsing_only() {
     
     print_info "Testing subscription parsing: $url"
     
-    # Test parsing with timeout
+    # Test parsing with timeout and show errors
     local nodes_json
-    nodes_json=$(timeout 3 bash scripts/parse.sh "$url" 2>/dev/null || echo "[]")
+    print_info "Running: bash scripts/parse.sh \"$url\""
+    nodes_json=$(timeout 3 bash scripts/parse.sh "$url" 2>&1 || echo "[]")
+    
+    # Debug output
+    if [ "$nodes_json" = "[]" ] || [ -z "$nodes_json" ]; then
+        print_error "Parse script output: $nodes_json"
+    fi
     
     if [ "$nodes_json" = "[]" ] || [ -z "$nodes_json" ]; then
         print_error "Parsing failed or no nodes found"
