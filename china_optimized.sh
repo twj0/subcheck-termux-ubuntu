@@ -120,37 +120,79 @@ install_go_subscheck() {
         arch="linux_amd64"
     fi
     
-    # 获取最新版本信息
-    local api_url="https://api.github.com/repos/beck-8/subs-check/releases/latest"
+    # 尝试多种方式获取版本信息
+    local download_url=""
+    local version="v1.0.0"  # 默认版本
+    
+    # 方法1: 通过代理API
+    print_info "尝试通过代理获取版本信息..."
+    local api_url="${GITHUB_PROXY}https://api.github.com/repos/beck-8/subs-check/releases/latest"
     local release_info
-    
-    if ! release_info=$(optimized_curl "$api_url"); then
-        print_error "无法获取subs-check版本信息"
-        return 1
+    if release_info=$(curl -s --connect-timeout 10 "$api_url" 2>/dev/null); then
+        download_url=$(echo "$release_info" | jq -r ".assets[] | select(.name | test(\"${arch}\")) | .browser_download_url" 2>/dev/null | head -1)
+        version=$(echo "$release_info" | jq -r ".tag_name" 2>/dev/null)
     fi
     
-    # 解析下载链接
-    local download_url
-    download_url=$(echo "$release_info" | jq -r ".assets[] | select(.name | test(\"${arch}\")) | .browser_download_url" | head -1)
-    
+    # 方法2: 直接API调用
     if [ -z "$download_url" ] || [ "$download_url" = "null" ]; then
-        print_error "未找到适合的subs-check版本"
-        return 1
+        print_info "尝试直接API调用..."
+        if release_info=$(curl -s --connect-timeout 15 "https://api.github.com/repos/beck-8/subs-check/releases/latest" 2>/dev/null); then
+            download_url=$(echo "$release_info" | jq -r ".assets[] | select(.name | test(\"${arch}\")) | .browser_download_url" 2>/dev/null | head -1)
+            version=$(echo "$release_info" | jq -r ".tag_name" 2>/dev/null)
+        fi
     fi
+    
+    # 方法3: 使用预设的下载链接
+    if [ -z "$download_url" ] || [ "$download_url" = "null" ]; then
+        print_warning "API调用失败，使用预设下载链接..."
+        version="v1.0.0"
+        download_url="https://github.com/beck-8/subs-check/releases/download/${version}/subs-check_${version}_${arch}.tar.gz"
+    fi
+    
+    print_info "下载链接: $download_url"
     
     # 下载并安装
     local temp_file="/tmp/subs-check-${arch}.tar.gz"
     if optimized_curl "$download_url" "$temp_file"; then
         mkdir -p subs-check-go
-        tar -xzf "$temp_file" -C subs-check-go/
-        chmod +x subs-check-go/subs-check
-        rm "$temp_file"
-        print_info "Go版本subs-check安装完成"
-        return 0
-    else
-        print_error "下载subs-check失败"
-        return 1
+        if tar -xzf "$temp_file" -C subs-check-go/ 2>/dev/null; then
+            # 查找可执行文件
+            local exe_file=$(find subs-check-go/ -name "subs-check" -type f | head -1)
+            if [ -n "$exe_file" ]; then
+                chmod +x "$exe_file"
+                # 如果不在根目录，移动到根目录
+                if [ "$exe_file" != "subs-check-go/subs-check" ]; then
+                    mv "$exe_file" subs-check-go/subs-check
+                fi
+                rm "$temp_file"
+                print_info "Go版本subs-check安装完成"
+                return 0
+            else
+                print_warning "压缩包中未找到subs-check可执行文件"
+            fi
+        else
+            print_warning "解压失败，可能是zip格式"
+            # 尝试作为zip文件解压
+            if command -v unzip >/dev/null 2>&1; then
+                mv "$temp_file" "${temp_file%.tar.gz}.zip"
+                if unzip -q "${temp_file%.tar.gz}.zip" -d subs-check-go/; then
+                    local exe_file=$(find subs-check-go/ -name "subs-check*" -type f | head -1)
+                    if [ -n "$exe_file" ]; then
+                        chmod +x "$exe_file"
+                        mv "$exe_file" subs-check-go/subs-check
+                        rm "${temp_file%.tar.gz}.zip"
+                        print_info "Go版本subs-check安装完成"
+                        return 0
+                    fi
+                fi
+                rm -f "${temp_file%.tar.gz}.zip"
+            fi
+        fi
+        rm -f "$temp_file"
     fi
+    
+    print_warning "Go版本subs-check安装失败，将使用基础测试模式"
+    return 1
 }
 
 # 优化的订阅解析
@@ -348,10 +390,8 @@ main() {
     optimize_dns
     trap restore_dns EXIT
     
-    # 尝试安装Go版本的subs-check
-    if [ ! -f "subs-check-go/subs-check" ]; then
-        install_go_subscheck || print_warning "Go版本安装失败，使用基础测试模式"
-    fi
+    # 尝试安装Go版本的subs-check（跳过以避免API限制）
+    print_warning "跳过Go版本下载，使用基础测试模式（避免GitHub API限制）"
     
     # 解析订阅
     local nodes_json
