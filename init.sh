@@ -81,5 +81,14 @@ print_info "Making shell scripts executable..."
 chmod +x main.sh
 chmod +x scripts/parse.sh
 chmod +x scripts/test_node.sh
+chmod +x init.sh
+
+# 5. Verify script permissions
+print_info "Verifying script permissions..."
+if [ -x "main.sh" ] && [ -x "scripts/parse.sh" ] && [ -x "scripts/test_node.sh" ]; then
+    print_info "All scripts have execute permissions."
+else
+    print_error "Some scripts may not have proper execute permissions."
+fi
 
 print_info "Initialization complete! You can now run the main script."
