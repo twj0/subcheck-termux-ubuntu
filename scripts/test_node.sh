@@ -9,7 +9,7 @@ CONFIG_FILE="temp_config.json"
 LOG_FILE="xray_temp.log"
 SOCKS_PORT=10808
 LATENCY_URL="http://www.google.com/gen_204"
-CURL_TIMEOUT=10 # seconds
+CURL_TIMEOUT=3 # seconds
 
 # --- Helper Functions ---
 print_error() {
@@ -163,7 +163,7 @@ fi
 # Start Xray
 $XRAY_BIN -c $CONFIG_FILE > /dev/null 2>&1 &
 XRAY_PID=$!
-sleep 2 # Give xray time to start
+sleep 1 # Give xray time to start (reduced from 2s)
 
 # Check if Xray process is running
 if ! ps -p $XRAY_PID > /dev/null; then
@@ -188,10 +188,10 @@ SPEED_ERROR="false"
 DOWNLOAD_SPEED="0"
 UPLOAD_SPEED="0"
 
-# Try a simple download speed test through the proxy
-DOWNLOAD_TEST_URL="http://speedtest.ftp.otenet.gr/files/test1Mb.db"
+# Try a simple download speed test through the proxy (smaller file for faster test)
+DOWNLOAD_TEST_URL="http://speedtest.ftp.otenet.gr/files/test100k.db"
 DOWNLOAD_START=$(date +%s.%N)
-DOWNLOAD_RESULT=$(curl -s -o /dev/null --socks5-hostname localhost:$SOCKS_PORT --connect-timeout 10 --max-time 30 -w "%{size_download}" "$DOWNLOAD_TEST_URL" 2>/dev/null || echo "0")
+DOWNLOAD_RESULT=$(curl -s -o /dev/null --socks5-hostname localhost:$SOCKS_PORT --connect-timeout 2 --max-time 3 -w "%{size_download}" "$DOWNLOAD_TEST_URL" 2>/dev/null || echo "0")
 DOWNLOAD_END=$(date +%s.%N)
 
 if [ "$DOWNLOAD_RESULT" != "0" ] && [ ! -z "$DOWNLOAD_RESULT" ]; then

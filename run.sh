@@ -51,13 +51,13 @@ ensure_executable() {
 # Function to test a single URL with timeout
 test_single_url() {
     local url="$1"
-    local timeout_duration=60
+    local timeout_duration=5
     
     print_info "Testing subscription: $url"
-    print_info "Timeout: ${timeout_duration}s"
+    print_info "Timeout: ${timeout_duration}s (fast mode)"
     
     # Run with timeout to prevent hanging
-    timeout $timeout_duration bash main.sh -i "$url" -l 2 -d 2>/dev/null || {
+    timeout $timeout_duration bash main.sh -i "$url" -l 1 -d 2>/dev/null || {
         local exit_code=$?
         if [ $exit_code -eq 124 ]; then
             print_error "Test timed out after ${timeout_duration} seconds"
