@@ -1,0 +1,16 @@
+{
+  "name": "subcheck-termux-ubuntu",
+  "version": "1.0.0",
+  "description": "SubCheck订阅测速工具 - Node.js格式转换器",
+  "main": "src/format_converter.js",
+  "scripts": {
+    "convert": "node src/format_converter.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["proxy", "subscription", "clash", "v2ray", "termux"],
+  "author": "SubCheck Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
