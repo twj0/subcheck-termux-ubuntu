@@ -16,7 +16,7 @@ print_error() {
 
 # 1. Update package list and install dependencies
 print_info "Updating package list and installing dependencies..."
-if sudo apt-get update && sudo apt-get install -y curl wget jq speedtest-cli unzip; then
+if sudo apt-get update && sudo apt-get install -y git curl wget jq speedtest-cli unzip; then
     print_info "Dependencies installed successfully."
 else
     print_error "Failed to install dependencies. Please check your network connection and permissions."
@@ -53,10 +53,13 @@ else
         exit 1
     fi
     
-    print_info "Downloading from: $LATEST_URL"
+    # Add ghproxy.com for users in mainland China
+    PROXY_URL="https://ghproxy.com/$LATEST_URL"
+    
+    print_info "Downloading from (via proxy): $PROXY_URL"
     
     # Download and unzip
-    wget -qO xray.zip "$LATEST_URL"
+    wget -qO xray.zip "$PROXY_URL"
     unzip -o xray.zip -d $XRAY_DIR
     
     # Clean up
