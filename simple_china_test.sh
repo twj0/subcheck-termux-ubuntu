@@ -84,6 +84,12 @@ test_tcp_connection() {
     local port="$2"
     local timeout=5
     
+    # 验证端口是否为数字
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+        echo "-1"
+        return 1
+    fi
+    
     local start_time end_time latency
     start_time=$(date +%s%3N)
     
@@ -177,6 +183,12 @@ main() {
             name=$(echo "$node_json" | grep -o '"name":"[^"]*"' | cut -d'"' -f4)
             address=$(echo "$node_json" | grep -o '"address":"[^"]*"' | cut -d'"' -f4)
             port=$(echo "$node_json" | grep -o '"port":"[^"]*"' | cut -d'"' -f4)
+            
+            # 验证地址和端口
+            if [ -z "$address" ] || [ -z "$port" ]; then
+                echo "[$node_count] 跳过无效节点: $name"
+                continue
+            fi
             
             echo -n "[$node_count] 测试 $name ($address:$port)... "
             
