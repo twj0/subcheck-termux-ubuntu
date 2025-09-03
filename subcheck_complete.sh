@@ -345,6 +345,7 @@ EOF
             "password": "$auth"
         }]
     }
+}
 EOF
             ;;
     esac
