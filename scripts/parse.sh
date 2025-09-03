@@ -102,10 +102,10 @@ RAW_CONTENT=""
 
 # 1. Get raw content based on input type
 if [[ "$INPUT" == http* ]]; then
-    # It's a URL, download content
-    DOWNLOADED_CONTENT=$(curl -sL "$INPUT")
+    # It's a URL, download content with timeout
+    DOWNLOADED_CONTENT=$(curl -sL --connect-timeout 10 --max-time 30 "$INPUT" 2>/dev/null)
     if [ -z "$DOWNLOADED_CONTENT" ]; then
-        print_error "Failed to download subscription from URL: $INPUT"
+        print_error "Failed to download subscription from URL: $INPUT (timeout or network error)"
         exit 1
     fi
     # Check if the content is likely Base64. A simple check is to see if it's one long line without spaces.
@@ -133,21 +133,31 @@ fi
 
 # 2. Parse the raw content line by line
 NODES_JSON="[]"
+LINE_COUNT=0
+PARSED_COUNT=0
+
+echo "[INFO] Parsing subscription content..." >&2
+
 while IFS= read -r line; do
     [ -z "$line" ] && continue
+    LINE_COUNT=$((LINE_COUNT + 1))
 
     if [[ "$line" == vless://* ]]; then
-        NODE_JSON=$(parse_vless_link "$line")
+        NODE_JSON=$(parse_vless_link "$line" 2>/dev/null)
         if [ ! -z "$NODE_JSON" ]; then
-            NODES_JSON=$(echo "$NODES_JSON" | jq --argjson node "$NODE_JSON" '. + [$node]')
+            NODES_JSON=$(echo "$NODES_JSON" | jq --argjson node "$NODE_JSON" '. + [$node]' 2>/dev/null)
+            PARSED_COUNT=$((PARSED_COUNT + 1))
         fi
     elif [[ "$line" == vmess://* ]]; then
-        NODE_JSON=$(parse_vmess_link "$line")
+        NODE_JSON=$(parse_vmess_link "$line" 2>/dev/null)
         if [ ! -z "$NODE_JSON" ]; then
-            NODES_JSON=$(echo "$NODES_JSON" | jq --argjson node "$NODE_JSON" '. + [$node]')
+            NODES_JSON=$(echo "$NODES_JSON" | jq --argjson node "$NODE_JSON" '. + [$node]' 2>/dev/null)
+            PARSED_COUNT=$((PARSED_COUNT + 1))
         fi
     fi
 done <<< "$RAW_CONTENT"
+
+echo "[INFO] Parsed $PARSED_COUNT nodes from $LINE_COUNT lines" >&2
 
 # 3. Output the final JSON array
 echo "$NODES_JSON"

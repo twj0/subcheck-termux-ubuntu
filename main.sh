@@ -14,11 +14,17 @@ print_error() {
 
 # --- Script Usage ---
 usage() {
-    echo "Usage: $0 -i <input_url_or_file> [-o <output_file.json>] [-d] [-l <limit>]"
+    echo "Usage: $0 -i <input_url_or_file> [-o <output_file.json>] [-d] [-l <limit>] [-h]"
     echo "  -i: Subscription URL or local file path (e.g., config.yaml)"
     echo "  -o: (Optional) Path to save the output JSON file."
     echo "  -d: (Optional) Enable debug mode for verbose output."
     echo "  -l: (Optional) Limit the number of nodes to test (default: all)."
+    echo "  -h: Show this help message."
+    echo ""
+    echo "Examples:"
+    echo "  $0 -i subscription.txt -l 5        # Test first 5 nodes"
+    echo "  $0 -i https://example.com/sub -d   # Test with debug output"
+    echo "  bash run.sh                        # One-click quick test"
     exit 1
 }
 
@@ -30,7 +36,7 @@ DEBUG_MODE=false
 NODE_LIMIT=""
 
 # Parse command-line arguments
-while getopts ":i:o:dl:" opt; do
+while getopts ":i:o:dl:h" opt; do
   case ${opt} in
     i )
       INPUT_SOURCE=$OPTARG
@@ -43,6 +49,9 @@ while getopts ":i:o:dl:" opt; do
       ;;
     l )
       NODE_LIMIT=$OPTARG
+      ;;
+    h )
+      usage
       ;;
     \? )
       usage
