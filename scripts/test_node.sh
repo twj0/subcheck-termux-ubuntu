@@ -1,61 +1,69 @@
 #!/bin/bash
 
-# SubsCheck Termux/Ubuntu Version
-# Node testing script
-
-# --- Input ---
-# $1: Standardized node information (JSON format)
-# $2: Path to the xray executable
-# $3: Path to the temporary directory
-
-NODE_INFO="$1"
-XRAY_PATH="$2"
-TEMP_DIR="$3"
+# Exit on error
+set -e
 
 # --- Configuration ---
-LOCAL_SOCKS_PORT=10808
-TEST_URL="http://www.google.com/gen_204"
-CONFIG_FILE="$TEMP_DIR/xray_config.json"
-XRAY_LOG_FILE="$TEMP_DIR/xray.log"
-XRAY_PID_FILE="$TEMP_DIR/xray.pid"
+XRAY_BIN="../xray/xray" # Relative path to the xray binary
+CONFIG_FILE="temp_config.json"
+LOG_FILE="xray_temp.log"
+SOCKS_PORT=10808
+LATENCY_URL="http://www.google.com/gen_204"
+CURL_TIMEOUT=10 # seconds
 
-# --- Functions ---
-generate_config() {
-    # This function generates a valid xray client config from the standardized NODE_INFO JSON.
-    # This is a complex part and depends heavily on the output of parse.sh
-    # This is a basic vmess example. It needs to be extended for vless, trojan etc.
-    
-    SERVER=$(echo "$NODE_INFO" | jq -r .server)
-    PORT=$(echo "$NODE_INFO" | jq -r .port)
-    TYPE=$(echo "$NODE_INFO" | jq -r .type)
-    UUID=$(echo "$NODE_INFO" | jq -r .uuid)
-    ALTERID=$(echo "$NODE_INFO" | jq -r .alterId)
-    CIPHER=$(echo "$NODE_INFO" | jq -r .cipher)
-    TLS=$(echo "$NODE_INFO" | jq -r .tls)
-    NETWORK=$(echo "$NODE_INFO" | jq -r .network)
+# --- Helper Functions ---
+print_error() {
+    echo -e "\033[31m[ERROR]\033[0m $1" >&2
+}
 
-    # Basic validation
-    if [ -z "$SERVER" ] || [ -z "$PORT" ] || [ -z "$UUID" ]; then
-        echo "{\"name\": \"$(echo "$NODE_INFO" | jq -r .name)\", \"status\": \"error\", \"reason\": \"Invalid node info\"}"
-        exit 1
+cleanup() {
+    # Kill the xray process if it's running
+    if [ ! -z "$XRAY_PID" ] && ps -p $XRAY_PID > /dev/null; then
+        kill $XRAY_PID
     fi
+    # Remove temporary files
+    rm -f $CONFIG_FILE $LOG_FILE
+}
 
-    TLS_SETTINGS="\"tls\""
-    if [ "$TLS" = "true" ]; then
-        TLS_SETTINGS="\"tls\""
-    else
-        TLS_SETTINGS="\"none\""
-    fi
+# Set trap to run cleanup function on script exit
+trap cleanup EXIT
 
-    # Create a minimal config
-    cat > "$CONFIG_FILE" << EOL
+# --- Main Logic ---
+
+# 1. Check for input
+if [ -z "$1" ]; then
+    print_error "Usage: $0 <node_json>"
+    exit 1
+fi
+
+NODE_JSON=$1
+NODE_NAME=$(echo "$NODE_JSON" | jq -r '.name')
+
+# Function to generate a failure JSON output
+generate_failure_output() {
+    jq -n \
+      --arg name "$NODE_NAME" \
+      '{name: $name, success: false, latency: -1, download: -1, upload: -1, error: $1}'
+}
+
+# 2. Generate Xray config from node JSON
+# This is a simplified config generator for VLESS + TCP + TLS
+ADDRESS=$(echo "$NODE_JSON" | jq -r '.address')
+PORT=$(echo "$NODE_JSON" | jq -r '.port')
+ID=$(echo "$NODE_JSON" | jq -r '.id')
+# A very basic way to get SNI from params, assuming format is ?...&sni=...
+SNI=$(echo "$NODE_JSON" | jq -r '.params' | grep -o 'sni=[^&]*' | cut -d= -f2)
+[ -z "$SNI" ] && SNI=$ADDRESS # Fallback SNI to address if not found
+
+cat > $CONFIG_FILE <<- EOM
 {
   "log": {
-    "loglevel": "warning"
+    "loglevel": "warning",
+    "access": "$LOG_FILE"
   },
   "inbounds": [
     {
-      "port": $LOCAL_SOCKS_PORT,
+      "port": $SOCKS_PORT,
       "protocol": "socks",
       "settings": {
         "auth": "noauth",
@@ -65,81 +73,77 @@ generate_config() {
   ],
   "outbounds": [
     {
-      "protocol": "$TYPE",
+      "protocol": "vless",
       "settings": {
         "vnext": [
           {
-            "address": "$SERVER",
+            "address": "$ADDRESS",
             "port": $PORT,
             "users": [
               {
-                "id": "$UUID",
-                "alterId": $ALTERID,
-                "security": "$CIPHER"
+                "id": "$ID",
+                "flow": "xtls-rprx-direct"
               }
             ]
           }
         ]
       },
       "streamSettings": {
-        "network": "$NETWORK",
-        "security": $TLS_SETTINGS
+        "network": "tcp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "$SNI"
+        }
       }
     }
   ]
 }
-EOL
-}
+EOM
 
-start_xray() {
-    if [ ! -f "$XRAY_PATH" ]; then
-        echo "{\"name\": \"$(echo "$NODE_INFO" | jq -r .name)\", \"status\": \"error\", \"reason\": \"Xray executable not found at $XRAY_PATH\"}"
-        exit 1
-    fi
-    
-    "$XRAY_PATH" -c "$CONFIG_FILE" > "$XRAY_LOG_FILE" 2>&1 &
-    echo $! > "$XRAY_PID_FILE"
-    sleep 2 # Give xray some time to start
-}
+# 3. Start Xray
+$XRAY_BIN -c $CONFIG_FILE > /dev/null 2>&1 &
+XRAY_PID=$!
+sleep 2 # Give xray time to start
 
-stop_xray() {
-    if [ -f "$XRAY_PID_FILE" ]; then
-        kill "$(cat "$XRAY_PID_FILE")"
-        rm "$XRAY_PID_FILE"
-    fi
-}
-
-# --- Main Logic ---
-# Ensure cleanup happens on exit
-trap stop_xray EXIT
-
-# 1. Generate config
-generate_config
-
-# 2. Start Xray
-start_xray
-
-# 3. Test Latency
-LATENCY_RESULT=$(curl -s -o /dev/null --socks5-hostname localhost:$LOCAL_SOCKS_PORT -w "%{time_connect}" "$TEST_URL")
-CURL_EXIT_CODE=$?
-
-if [ $CURL_EXIT_CODE -ne 0 ]; then
-    echo "{\"name\": \"$(echo "$NODE_INFO" | jq -r .name)\", \"status\": \"failed\", \"latency\": -1, \"speed_mbps\": 0}"
-    exit 0
+# Check if Xray process is running
+if ! ps -p $XRAY_PID > /dev/null; then
+    generate_failure_output "Failed to start Xray core."
+    exit 1
 fi
 
+# 4. Test Latency
+LATENCY_RESULT=$(curl -s -o /dev/null --socks5-hostname localhost:$SOCKS_PORT -w "%{time_connect}" --connect-timeout $CURL_TIMEOUT "$LATENCY_URL" || echo "timeout")
+
+if [ "$LATENCY_RESULT" == "timeout" ] || [ -z "$LATENCY_RESULT" ]; then
+    generate_failure_output "Latency test failed (timeout or error)."
+    exit 1
+fi
+# Convert to milliseconds
 LATENCY_MS=$(echo "$LATENCY_RESULT * 1000" | bc | cut -d. -f1)
 
-# 4. Test Speed
-# The --proxy flag is essential here
-SPEED_TEST_RESULT=$(speedtest-cli --proxy socks5://127.0.0.1:$LOCAL_SOCKS_PORT --simple)
-if [ $? -ne 0 ]; then
-    DOWNLOAD_SPEED="0"
-else
-    DOWNLOAD_SPEED=$(echo "$SPEED_TEST_RESULT" | grep "Download:" | awk '{print $2}')
+
+# 5. Test Speed
+# Use a try-catch block for speedtest-cli as it can be flaky
+SPEED_RESULT=""
+SPEED_ERROR="false"
+SPEED_RESULT=$(speedtest-cli --proxy socks5://127.0.0.1:$SOCKS_PORT --simple) || SPEED_ERROR="true"
+
+if [ "$SPEED_ERROR" == "true" ]; then
+    generate_failure_output "Speedtest failed."
+    exit 1
 fi
 
-# 5. Output result as JSON
-echo "{\"name\": \"$(echo "$NODE_INFO" | jq -r .name)\", \"status\": \"success\", \"latency_ms\": $LATENCY_MS, \"speed_mbps\": \"$DOWNLOAD_SPEED\"}"
+DOWNLOAD_SPEED=$(echo "$SPEED_RESULT" | grep "Download" | awk '{print $2}')
+UPLOAD_SPEED=$(echo "$SPEED_RESULT" | grep "Upload" | awk '{print $2}')
 
+# 6. Output result as JSON
+jq -n \
+  --arg name "$NODE_NAME" \
+  --argjson success true \
+  --argjson latency "$LATENCY_MS" \
+  --argjson download "$DOWNLOAD_SPEED" \
+  --argjson upload "$UPLOAD_SPEED" \
+  '{name: $name, success: $success, latency: $latency, download: $download, upload: $upload, error: null}'
+
+# The trap will handle cleanup
 exit 0

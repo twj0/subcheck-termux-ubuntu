@@ -1,0 +1,54 @@
+# This is an example configuration file for SubsCheck
+# It simulates a typical Clash configuration format.
+
+# Proxy providers (not used by our script, but common in Clash)
+proxy-providers:
+  my-provider:
+    type: http
+    url: "http://example.com/my-proxies.yaml"
+    interval: 3600
+    path: ./my-proxies.yaml
+    health-check:
+      enable: true
+      interval: 600
+      url: http://www.google.com/generate_204
+
+# The list of proxy nodes
+# Our script will parse this 'proxies' section.
+proxies:
+  # Example VMess Node
+  - name: "Example-VMess-Node"
+    type: vmess
+    server: vmess.server.com
+    port: 443
+    uuid: "00000000-0000-0000-0000-000000000001"
+    alterId: 0
+    cipher: auto
+    tls: true
+    network: ws
+    ws-opts:
+      path: "/vmess"
+      headers:
+        Host: vmess.server.com
+
+  # Example VLess Node
+  - name: "Example-VLess-Node"
+    type: vless
+    server: vless.server.com
+    port: 443
+    uuid: "00000000-0000-0000-0000-000000000002"
+    tls: true
+    network: tcp
+    servername: vless.server.com # For SNI
+    flow: xtls-rprx-direct
+
+  # A simple TCP node for testing basic connectivity
+  - name: "Example-TCP-Node"
+    type: vmess
+    server: 1.2.3.4
+    port: 12345
+    uuid: "00000000-0000-0000-0000-000000000003"
+    alterId: 0
+    cipher: auto
+    tls: false
+    network: tcp
