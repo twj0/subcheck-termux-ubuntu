@@ -242,35 +242,89 @@ class SubscriptionParser:
         }
     
     def parse_vmess_link(self, link: str) -> Optional[Dict]:
-        """解析VMess链接"""
+        """解析VMess链接 - 增强错误处理"""
         match = self.protocol_patterns['vmess'].match(link)
         if not match:
             return None
         
         try:
             encoded_config = match.group(1)
+            
+            # 清理Base64字符串
+            encoded_config = re.sub(r'[^A-Za-z0-9+/=]', '', encoded_config)
+            
             # 添加padding
             missing_padding = len(encoded_config) % 4
             if missing_padding:
                 encoded_config += '=' * (4 - missing_padding)
             
-            decoded = base64.b64decode(encoded_config)
-            config = json.loads(decoded.decode('utf-8'))
+            # 解码Base64
+            try:
+                decoded = base64.b64decode(encoded_config, validate=True)
+            except Exception:
+                # 尝试URL安全的Base64解码
+                encoded_config = encoded_config.replace('-', '+').replace('_', '/')
+                decoded = base64.b64decode(encoded_config, validate=True)
+            
+            # 清理解码后的数据，移除非打印字符
+            decoded_str = decoded.decode('utf-8', errors='ignore')
+            # 移除控制字符，保留可打印字符
+            decoded_str = ''.join(char for char in decoded_str if char.isprintable() or char in '\n\r\t')
+            
+            # 尝试修复常见的JSON格式问题
+            decoded_str = decoded_str.strip()
+            if not decoded_str.startswith('{'):
+                # 查找第一个{
+                start_idx = decoded_str.find('{')
+                if start_idx != -1:
+                    decoded_str = decoded_str[start_idx:]
+            
+            if not decoded_str.endswith('}'):
+                # 查找最后一个}
+                end_idx = decoded_str.rfind('}')
+                if end_idx != -1:
+                    decoded_str = decoded_str[:end_idx + 1]
+            
+            config = json.loads(decoded_str)
+            
+            # 验证必要字段
+            server = config.get('add', '').strip()
+            if not server:
+                return None
+            
+            # 安全的端口号转换
+            port_str = str(config.get('port', '0')).strip()
+            try:
+                port = int(float(port_str))  # 先转float再转int，处理"443.0"这种情况
+                if not (1 <= port <= 65535):
+                    return None
+            except (ValueError, TypeError):
+                return None
+            
+            # 安全的alterId转换
+            aid_str = str(config.get('aid', '0')).strip()
+            try:
+                alter_id = int(float(aid_str))
+            except (ValueError, TypeError):
+                alter_id = 0
             
             return {
-                'name': config.get('ps', f"VMess-{config.get('add', 'unknown')}"),
+                'name': config.get('ps', f"VMess-{server}:{port}").strip(),
                 'type': 'vmess',
-                'server': config.get('add', ''),
-                'port': int(config.get('port', 0)),
-                'uuid': config.get('id', ''),
-                'alterId': int(config.get('aid', 0)),
-                'cipher': config.get('scy', 'auto'),
-                'network': config.get('net', 'tcp'),
-                'tls': config.get('tls', ''),
-                'host': config.get('host', ''),
-                'path': config.get('path', ''),
+                'server': server,
+                'port': port,
+                'uuid': config.get('id', '').strip(),
+                'alterId': alter_id,
+                'cipher': config.get('scy', 'auto').strip(),
+                'network': config.get('net', 'tcp').strip(),
+                'tls': config.get('tls', '').strip(),
+                'host': config.get('host', '').strip(),
+                'path': config.get('path', '').strip(),
                 'raw_link': link
             }
+        except json.JSONDecodeError as e:
+            logger.error(f"VMess JSON解析失败: {e}")
+            return None
         except Exception as e:
             logger.error(f"VMess解析失败: {e}")
             return None
