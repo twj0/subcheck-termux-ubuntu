@@ -102,8 +102,15 @@ RAW_CONTENT=""
 
 # 1. Get raw content based on input type
 if [[ "$INPUT" == http* ]]; then
-    # It's a URL, download content with timeout
-    DOWNLOADED_CONTENT=$(curl -sL --connect-timeout 10 --max-time 30 "$INPUT" 2>/dev/null)
+    # It's a URL, check for GitHub and apply proxy if needed
+    local url="$INPUT"
+    if [[ "$url" == *"github.com"* ]] || [[ "$url" == *"githubusercontent.com"* ]]; then
+        echo "[INFO] Using GitHub proxy for URL: $url" >&2
+        url="https://ghfast.top/${url}"
+    fi
+    
+    # Download content with timeout
+    DOWNLOADED_CONTENT=$(curl -sL --connect-timeout 10 --max-time 30 "$url" 2>/dev/null)
     if [ -z "$DOWNLOADED_CONTENT" ]; then
         print_error "Failed to download subscription from URL: $INPUT (timeout or network error)"
         exit 1
