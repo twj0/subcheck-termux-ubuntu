@@ -38,6 +38,44 @@ parse_subscription() {
     echo "$content"
 }
 
+# 解析VMESS配置
+parse_vmess() {
+    local vmess_url="$1"
+    local config="${vmess_url#vmess://}"
+    
+    # 添加padding以确保Base64解码正确
+    local padding=$((4 - ${#config} % 4))
+    if [ $padding -ne 4 ]; then
+        config="${config}${printf '=%.0s' $(seq 1 $padding)}"
+    fi
+    
+    local decoded=$(echo "$config" | base64 -d 2>/dev/null)
+    
+    if [ -z "$decoded" ]; then
+        warn "无法解码VMESS配置: $config"
+        return 1
+    fi
+    
+    # 调试输出
+    info "解码的VMESS配置: $decoded"
+    
+    # 使用简单的字符串解析而不是jq
+    local address=$(echo "$decoded" | grep -o '"add"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+    local port=$(echo "$decoded" | grep -o '"port"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*$')
+    local name=$(echo "$decoded" | grep -o '"ps"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+    
+    if [ -z "$address" ] || [ -z "$port" ]; then
+        warn "无效的VMESS配置: $decoded"
+        return 1
+    fi
+    
+    if [ -z "$name" ]; then
+        name="$address:$port"
+    fi
+    
+    echo "$name $address $port"
+}
+
 # 核心功能：测试节点延迟
 test_latency() {
     local address="$1"
@@ -93,8 +131,13 @@ main() {
     local tested=0
     local successful=0
     
-    # 解析VLESS链接
+    # 解析订阅链接
     while IFS= read -r line; do
+        line=$(echo "$line" | tr -d '\r' | xargs)
+        if [ -z "$line" ]; then
+            continue
+        fi
+        
         if [[ "$line" == vless://* ]]; then
             tested=$((tested + 1))
             
@@ -104,18 +147,21 @@ main() {
             local server_info="${config#*@}"
             local address="${server_info%%:*}"
             local port="${server_info#*:}"
-            port="${port%%/*}"
+            port="${port%%[?]*}"  # 移除?后面的参数
             
+            # 提取节点名称（如果有#标签）
             local name="${line##*#}"
             if [ "$name" == "$line" ]; then
-                name="$address:$port"
+                name="VLESS-$address:$port"
             fi
             
-            info "测试节点: $name"
+            info "测试VLESS节点: $name (地址: $address, 端口: $port)"
             
             # 测试延迟
             local latency=$(test_latency "$address" "$port")
             local speed=$(test_speed "$address" "$port")
+            
+            info "测试结果 - 延迟: ${latency}ms, 速度: ${speed}Mbps"
             
             local result
             if [ "$latency" -ne -1 ]; then
@@ -136,6 +182,48 @@ main() {
             fi
             
             results=$(echo "$results" | jq --argjson res "$result" '. + [$res]')
+            
+        elif [[ "$line" == vmess://* ]]; then
+            tested=$((tested + 1))
+            
+            # 解析VMESS链接
+            info "发现VMESS链接: $line"
+            local vmess_info=$(parse_vmess "$line")
+            if [ $? -eq 0 ]; then
+                local name=$(echo "$vmess_info" | awk '{print $1}')
+                local address=$(echo "$vmess_info" | awk '{print $2}')
+                local port=$(echo "$vmess_info" | awk '{print $3}')
+                
+                info "测试VMESS节点: $name (地址: $address, 端口: $port)"
+                
+                # 测试延迟
+                local latency=$(test_latency "$address" "$port")
+                local speed=$(test_speed "$address" "$port")
+                
+                info "测试结果 - 延迟: ${latency}ms, 速度: ${speed}Mbps"
+                
+                local result
+                if [ "$latency" -ne -1 ]; then
+                    successful=$((successful + 1))
+                    result=$(jq -n \
+                        --arg name "$name" \
+                        --arg address "$address" \
+                        --arg port "$port" \
+                        --arg latency "$latency" \
+                        --arg speed "$speed" \
+                        '{name: $name, address: $address, port: $port, latency: $latency|tonumber, speed: $speed|tonumber, success: true}')
+                else
+                    result=$(jq -n \
+                        --arg name "$name" \
+                        --arg address "$address" \
+                        --arg port "$port" \
+                        '{name: $name, address: $address, port: $port, latency: -1, speed: -1, success: false}')
+                fi
+                
+                results=$(echo "$results" | jq --argjson res "$result" '. + [$res]')
+            else
+                warn "跳过无效的VMESS链接: $line"
+            fi
         fi
     done <<< "$content"
     
