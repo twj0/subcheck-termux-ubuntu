@@ -2,3 +2,4 @@ aiohttp>=3.8.0
 pyyaml>=6.0
 asyncio
 urllib3>=1.26.0
+yaml>=5.3.1
