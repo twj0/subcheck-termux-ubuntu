@@ -6,8 +6,7 @@ authors = [{name = "SubCheck Team"}]
 dependencies = [
     "aiohttp>=3.8.0",
     "pyyaml>=6.0",
-    "urllib3>=1.26.0",
-    "yaml"
+    "urllib3>=1.26.0"
 ]
 requires-python = ">=3.8"
 
