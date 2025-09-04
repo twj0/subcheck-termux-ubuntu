@@ -1,27 +1,97 @@
-# SubCheck 配置文件
+# SubCheck 配置文件 
 
-# 测试间隔 (秒)
-interval: 3600
+# 网络设置
+network:
+  # 用户网速 (Mbps) - 用于计算最优并发数
+  user_bandwidth: 300
+  # 自动计算并发数 (基于网速的80%利用率)
+  auto_concurrent: true
+  # 手动设置并发数 (当auto_concurrent为false时生效)
+  manual_concurrent: 5
 
-# 最大测试节点数
-max_nodes: 20
-
-# 超时设置
-timeout:
-  connect: 10
-  total: 30
+# 测试设置
+test:
+  # 最大测试节点数
+  max_nodes: 50
+  # 测试超时设置 (秒)
+  timeout:
+    connect: 8        # TCP连接超时
+    latency: 5        # 延迟测试超时
+    speed: 15         # 速度测试超时
+    proxy_start: 3    # 代理启动超时
+  # 重试设置
+  retry:
+    count: 1          # 失败重试次数
+    delay: 2          # 重试间隔 (秒)
+  # 速度测试
+  speed:
+    test_duration: 8  # 速度测试持续时间 (秒)
+    min_size: 1048576 # 最小测试大小 1MB
+    endpoints_limit: 2 # 每个节点测试的端点数量
 
 # 代理设置
 proxy:
-  socks_port: 10808
-  
-# 测试设置
-test:
-  speed_test_size: 1048576  # 1MB
-  max_concurrent: 3
-  retry_count: 2
+  # SOCKS5代理端口范围
+  port_range:
+    start: 10800
+    end: 10900
+  # 代理启动优化
+  startup:
+    parallel_limit: 10    # 并行启动代理数量
+    warmup_time: 1        # 代理预热时间 (秒)
+    health_check: true    # 启动后健康检查
+
+# GitHub代理设置 (用于安装依赖)
+github_proxy:
+  enabled: true
+  mirrors:
+    - "https://ghfast.top/"
+    - "https://gh-proxy.com/"
+    - "https://ghproxy.net/"
+    - "https://mirror.ghproxy.com/"
+  # 自动选择最快代理
+  auto_select: true
+
+# 订阅解析设置
+subscription:
+  # 缓存设置
+  cache:
+    enabled: true
+    duration: 1800    # 缓存时间 30分钟
+  # 并发解析数
+  concurrent_parse: 10
+  # 去重设置
+  deduplication:
+    enabled: true
+    key_fields: ["server", "port", "type"]
+
+# 结果输出设置
+output:
+  # 结果排序方式: latency, speed, mixed
+  sort_by: "mixed"
+  # 显示节点数量
+  display_count: 10
+  # 生成报告
+  report:
+    enabled: true
+    format: ["json", "markdown"]
+    include_failed: false
 
 # 日志设置
-log:
-  level: info
-  file: subcheck.log
+logging:
+  level: "INFO"       # DEBUG, INFO, WARNING, ERROR
+  file: "logs/subcheck.log"
+  max_size: "10MB"
+  backup_count: 3
+  console: true
+
+# 性能优化设置
+performance:
+  # 内存限制 (MB)
+  memory_limit: 512
+  # CPU核心数 (0为自动检测)
+  cpu_cores: 0
+  # 异步IO优化
+  async_io:
+    connector_limit: 100
+    connector_limit_per_host: 10
