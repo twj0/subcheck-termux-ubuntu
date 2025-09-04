@@ -46,8 +46,30 @@ update_packages() {
 # 安装基础工具
 install_basic_tools() {
     log_info "安装基础工具..."
-    apt install -y curl wget jq bc netcat-openbsd python3 python3-pip
+    apt install -y curl wget jq bc netcat-openbsd python3 python3-pip python3-yaml
     log_success "基础工具安装完成"
+}
+
+# 安装Python依赖
+install_python_deps() {
+    log_info "安装Python依赖..."
+    
+    # 方法1: 使用apt安装python-yaml
+    if ! python3 -c "import yaml" 2>/dev/null; then
+        log_info "通过apt安装python3-yaml..."
+        apt install -y python3-yaml || {
+            log_warning "apt安装失败，尝试使用pip3安装"
+            pip3 install pyyaml || log_error "Python依赖安装失败"
+        }
+    fi
+    
+    # 验证安装
+    if python3 -c "import yaml; print('YAML support available')"; then
+        log_success "Python依赖安装完成"
+    else
+        log_error "Python依赖安装失败"
+        return 1
+    fi
 }
 
 # 安装Xray
@@ -149,6 +171,14 @@ test_installation() {
         fi
     done
     
+    # 测试Python依赖
+    if python3 -c "import yaml, asyncio, aiohttp"; then
+        log_success "✓ Python依赖可用"
+    else
+        log_error "✗ Python依赖不可用"
+        failed_commands+=("python-dependencies")
+    fi
+    
     if [[ ${#failed_commands[@]} -eq 0 ]]; then
         log_success "所有依赖安装成功!"
         return 0
@@ -167,6 +197,7 @@ main() {
     check_root
     update_packages
     install_basic_tools
+    install_python_deps
     install_xray
     optimize_system
     setup_workspace

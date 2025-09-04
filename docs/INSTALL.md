@@ -1,5 +1,5 @@
 # 安装指南
-
+apt install python3-yaml
 ## 系统要求
 
 - **操作系统**: Ubuntu 18.04+, Debian 10+, Termux, WSL

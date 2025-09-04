@@ -50,7 +50,7 @@ install_deps() {
     apt update -qq
     
     # 安装必要工具
-    apt install -y curl wget jq bc netcat-openbsd python3 unzip >/dev/null 2>&1
+    apt install -y curl wget jq bc netcat-openbsd python3 unzip python3-yaml >/dev/null 2>&1
     
     log "✓ 基础工具安装完成"
 }
